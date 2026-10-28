@@ -222,4 +222,4 @@ curl -sS -X PUT http://CONTROLLER_IP:8443/v1/ops/relays/<relay_id>/label \
 
 ## License
 
-Traced is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).
+TRACED is licensed under the GNU Affero General Public License v3.0. See [LICENSE](LICENSE).

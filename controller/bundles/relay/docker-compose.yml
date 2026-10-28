@@ -1,0 +1,25 @@
+version: "3.8"
+services:
+  relay:
+    restart: unless-stopped
+    build: ./relay
+    ports:
+      - "9443:9443"
+    environment:
+      EDGE_RELAY_ID: ${EDGE_RELAY_ID}
+      EDGE_DB: /data/edge.db
+      CORE_URL: ${CORE_URL}
+      EDGE_SHARED_SECRET: ${TRACED_SHARED_SECRET}
+      EDGE_API_KEY: ${EDGE_API_KEY}
+      EDGE_SO_HOST: ${EDGE_SO_HOST}
+      EDGE_SO_PORT: ${EDGE_SO_PORT}
+      EDGE_SO_PROTO: ${EDGE_SO_PROTO}
+      EDGE_POLL_SECONDS: ${EDGE_POLL_SECONDS}
+      EDGE_META_HOSTNAME: ${EDGE_META_HOSTNAME}
+      EDGE_META_MODEL: ${EDGE_META_MODEL}
+      EDGE_META_SERIAL: ${EDGE_META_SERIAL}
+      EDGE_META_ARCH: ${EDGE_META_ARCH}
+    volumes:
+      - relay_data:/data
+volumes:
+  relay_data:

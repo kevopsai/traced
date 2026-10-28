@@ -1,0 +1,20 @@
+[Unit]
+Description=TRACED Relay (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/traced-mvp
+EnvironmentFile=/opt/traced-mvp/.env
+
+ExecStart=/usr/bin/env CORE_URL={{CORE_URL}} \
+  /usr/bin/docker compose --env-file /opt/traced-mvp/.env up -d --build relay
+
+ExecStop=/usr/bin/docker compose --env-file /opt/traced-mvp/.env down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target

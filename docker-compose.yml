@@ -1,0 +1,47 @@
+services:
+  controller:
+    build: ./controller
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    environment:
+      TRACED_CONTROLLER_DB: /data/controller.db
+      TRACED_SHARED_SECRET: ${TRACED_SHARED_SECRET}
+      OPS_API_KEY: ${OPS_API_KEY}
+      EDGE_API_KEY: ${EDGE_API_KEY}
+      TRACED_SO_HOST: ${TRACED_SO_HOST}
+      TRACED_SO_PORT: ${TRACED_SO_PORT}
+      TRACED_SO_PROTO: ${TRACED_SO_PROTO}
+      CANARY_API_BASE: ${CANARY_API_BASE}
+      CANARY_AUTH_TOKEN: ${CANARY_AUTH_TOKEN}
+      CANARY_FLOCK_ID: ${CANARY_FLOCK_ID}
+      DASHBOARD_WEBHOOK_URL: ${DASHBOARD_WEBHOOK_URL}
+      DASHBOARD_WEBHOOK_SECRET: ${DASHBOARD_WEBHOOK_SECRET}
+    volumes:
+      - controller_data:/data
+
+  relay:
+    restart: unless-stopped
+    build: ./relay
+    ports:
+      - "9443:9443"
+    environment:
+      EDGE_RELAY_ID: ${EDGE_RELAY_ID}
+      EDGE_DB: /data/edge.db
+      CORE_URL: http://controller:8443
+      EDGE_SHARED_SECRET: ${TRACED_SHARED_SECRET}
+      EDGE_API_KEY: ${EDGE_API_KEY}
+      EDGE_SO_HOST: ${EDGE_SO_HOST}
+      EDGE_SO_PORT: ${EDGE_SO_PORT}
+      EDGE_SO_PROTO: ${EDGE_SO_PROTO}
+      EDGE_POLL_SECONDS: ${EDGE_POLL_SECONDS}
+      DASHBOARD_WEBHOOK_URL: ${DASHBOARD_WEBHOOK_URL}
+      DASHBOARD_WEBHOOK_SECRET: ${DASHBOARD_WEBHOOK_SECRET}
+    depends_on:
+      - controller
+    volumes:
+      - relay_data:/data
+
+volumes:
+  controller_data:
+  relay_data:

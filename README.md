@@ -28,6 +28,106 @@ Operator (ops API)
 
 **Agent** — runs on target hosts (or attacker-controlled machines during simulation). Polls the relay for jobs, executes workloads (file artifact drops, Docker containers), and emits ECS-format logs back through the relay.
 
+## Architecture
+
+Component-level view of the controller, relay, and agent tiers and how data flows between them. Nodes link to their source files. Interactive version: [gitdiagram.com/kevopsai/traced](https://gitdiagram.com/kevopsai/traced).
+
+```mermaid
+flowchart TD
+
+subgraph group_controller["Controller"]
+  node_campaign_api["Campaign API<br/>[app.py]"]
+  node_controller_db[("Controller store<br/>[db.py]")]
+  node_schemas["API models<br/>[models.py]"]
+  node_job_dispatch["Job dispatch<br/>[pusher.py]"]
+  node_token_provider["Canary provider<br/>[canary.py]"]
+  node_detection_rules["Detection rules<br/>[rules.py]"]
+  node_controller_telemetry["Event handling<br/>[telemetry.py]"]
+  node_controller_forwarder["SIEM forwarding<br/>[forwarder.py]"]
+end
+
+subgraph group_relay["Relay"]
+  node_relay_api["Relay API<br/>[app.py]"]
+  node_relay_store[("Relay buffer<br/>[db.py]")]
+  node_relay_models["Relay messages<br/>[models.py]"]
+  node_relay_telemetry["Relay syslog<br/>[telemetry.py]"]
+end
+
+subgraph group_agent["Agent"]
+  node_agent_runtime["Agent runtime<br/>[main.py]"]
+  node_agent_state[("Deployment state<br/>[state.py]")]
+  node_file_lure["File artifact<br/>[file_artifact.py]"]
+  node_docker_workload["Docker workload<br/>[docker_workload.py]"]
+  node_agent_signing["Envelope signing<br/>[signing.py]"]
+  node_agent_telemetry["Agent telemetry<br/>[telemetry.py]"]
+end
+
+subgraph group_integrations["Integrations"]
+  node_canary_service{{"Canarytokens"}}
+  node_siem{{"Syslog receiver"}}
+end
+
+node_operator(("Operator"))
+
+node_operator -->|"manages campaigns"| node_campaign_api
+node_campaign_api -->|"stores campaign data"| node_controller_db
+node_campaign_api -->|"uses request models"| node_schemas
+node_campaign_api -->|"pushes jobs"| node_job_dispatch
+node_campaign_api -->|"creates and downloads tokens"| node_token_provider
+node_campaign_api -->|"evaluates detections"| node_detection_rules
+node_campaign_api -->|"handles events"| node_controller_telemetry
+node_campaign_api -.->|"forwards events"| node_controller_forwarder
+node_canary_service -->|"sends hit webhook"| node_campaign_api
+node_token_provider -->|"requests tokens"| node_canary_service
+node_job_dispatch -->|"delivers jobs"| node_relay_api
+node_relay_api -->|"buffers jobs and agents"| node_relay_store
+node_relay_api -->|"validates messages"| node_relay_models
+node_agent_runtime -->|"checks in and polls"| node_relay_api
+node_relay_api -->|"forwards checkins and results"| node_campaign_api
+node_agent_runtime -->|"reads and saves deployments"| node_agent_state
+node_agent_runtime -->|"applies or removes"| node_file_lure
+node_agent_runtime -->|"applies or removes"| node_docker_workload
+node_agent_runtime -->|"verifies envelopes"| node_agent_signing
+node_agent_runtime -->|"emits workload events"| node_agent_telemetry
+node_agent_runtime -->|"posts logs and results"| node_relay_api
+node_relay_api -->|"forwards ECS events"| node_controller_telemetry
+node_relay_api -->|"forwards to syslog"| node_relay_telemetry
+node_relay_telemetry -->|"sends syslog"| node_siem
+node_controller_forwarder -.->|"forwards token events"| node_siem
+
+click node_campaign_api "https://github.com/kevopsai/traced/blob/main/controller/app.py"
+click node_controller_db "https://github.com/kevopsai/traced/blob/main/controller/db.py"
+click node_schemas "https://github.com/kevopsai/traced/blob/main/controller/models.py"
+click node_job_dispatch "https://github.com/kevopsai/traced/blob/main/controller/pusher.py"
+click node_token_provider "https://github.com/kevopsai/traced/blob/main/controller/providers/canary.py"
+click node_detection_rules "https://github.com/kevopsai/traced/blob/main/controller/rules.py"
+click node_controller_telemetry "https://github.com/kevopsai/traced/blob/main/controller/telemetry.py"
+click node_controller_forwarder "https://github.com/kevopsai/traced/blob/main/controller/forwarder.py"
+click node_relay_api "https://github.com/kevopsai/traced/blob/main/relay/app.py"
+click node_relay_store "https://github.com/kevopsai/traced/blob/main/relay/db.py"
+click node_relay_models "https://github.com/kevopsai/traced/blob/main/relay/models.py"
+click node_relay_telemetry "https://github.com/kevopsai/traced/blob/main/relay/telemetry.py"
+click node_agent_runtime "https://github.com/kevopsai/traced/blob/main/agent/main.py"
+click node_agent_state "https://github.com/kevopsai/traced/blob/main/agent/state.py"
+click node_file_lure "https://github.com/kevopsai/traced/blob/main/agent/plugins/file_artifact.py"
+click node_docker_workload "https://github.com/kevopsai/traced/blob/main/agent/plugins/docker_workload.py"
+click node_agent_signing "https://github.com/kevopsai/traced/blob/main/agent/signing.py"
+click node_agent_telemetry "https://github.com/kevopsai/traced/blob/main/agent/telemetry.py"
+
+classDef toneNeutral fill:#f8fafc,stroke:#334155,stroke-width:1.5px,color:#0f172a
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+classDef toneTeal fill:#ccfbf1,stroke:#0f766e,stroke-width:1.5px,color:#134e4a
+class node_campaign_api,node_controller_db,node_schemas,node_job_dispatch,node_token_provider,node_detection_rules,node_controller_telemetry,node_controller_forwarder toneBlue
+class node_relay_api,node_relay_store,node_relay_models,node_relay_telemetry toneAmber
+class node_agent_runtime,node_agent_state,node_file_lure,node_docker_workload,node_agent_signing,node_agent_telemetry toneMint
+class node_canary_service,node_siem toneRose
+class node_operator toneIndigo
+```
+
 ## Workload types
 
 | Type | What it does |
